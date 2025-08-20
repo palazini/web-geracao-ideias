@@ -1,27 +1,23 @@
-import { useState } from "react";
+// src/pages/IdeaNew.jsx
+import { useEffect, useState } from "react";
 import {
-  TextInput,
-  Textarea,
-  Select,
-  Paper,
-  Title,
-  Button,
-  Group,
-  Stack,
+  Paper, Title, Text, TextInput, Textarea, Select,
+  Group, Button, Stack, Divider
 } from "@mantine/core";
-import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { db } from "../lib/firebase";
+import {
+  addDoc, collection, serverTimestamp, doc, getDoc
+} from "firebase/firestore";
 
 const AREAS = [
-  { value: "Segurança", label: "Segurança" },
-  { value: "Qualidade", label: "Qualidade" },
-  { value: "Produtividade", label: "Produtividade" },
-  { value: "Custo", label: "Custo" },
-  { value: "Ergonomia", label: "Ergonomia" },
+  { value: "produtividade", label: "Produtividade" },
+  { value: "seguranca", label: "Segurança" },
+  { value: "qualidade", label: "Qualidade" },
+  { value: "custo", label: "Custo" },
+  { value: "outros", label: "Outros" },
 ];
 
 const IMPACTOS = [
@@ -31,112 +27,155 @@ const IMPACTOS = [
 ];
 
 export default function IdeaNew() {
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [area, setArea] = useState("produtividade");
+  const [impact, setImpact] = useState("medio");
   const [saving, setSaving] = useState(false);
 
-  const form = useForm({
-    initialValues: {
-      title: "",
-      description: "",
-      area: "Produtividade",
-      impact: "medio",
-    },
-    validate: {
-      title: (v) => (v.trim().length < 4 ? "Título muito curto" : null),
-      description: (v) =>
-        v.trim().length < 10 ? "Descreva melhor sua ideia" : null,
-      area: (v) => (!v ? "Selecione uma área" : null),
-      impact: (v) => (!v ? "Selecione o impacto" : null),
-    },
-  });
+  // se não estiver logado, bloqueia
+  useEffect(() => {
+    if (!user) {
+      notifications.show({ color: "red", message: "Faça login para enviar uma ideia." });
+      navigate("/login");
+    }
+  }, [user, navigate]);
 
-  async function onSubmit(values) {
+  async function getAuthorNameFallback() {
+    // Busca nome preferindo o doc /users; cai para displayName/email/uid
+    try {
+      const uref = doc(db, "users", user.uid);
+      const usnap = await getDoc(uref);
+      const data = usnap.exists() ? usnap.data() : {};
+      return (
+        (typeof data.displayName === "string" && data.displayName.trim()) ||
+        (typeof data.username === "string" && data.username.trim()) ||
+        (typeof user.displayName === "string" && user.displayName.trim()) ||
+        user.email ||
+        user.uid
+      );
+    } catch {
+      return user.displayName || user.email || user.uid;
+    }
+  }
+
+  function validate() {
+    if (!title.trim() || title.trim().length < 3) {
+      notifications.show({ color: "yellow", message: "Informe um título com pelo menos 3 caracteres." });
+      return false;
+    }
+    if (!description.trim() || description.trim().length < 10) {
+      notifications.show({ color: "yellow", message: "Descreva a ideia com pelo menos 10 caracteres." });
+      return false;
+    }
+    if (!area) {
+      notifications.show({ color: "yellow", message: "Selecione a área." });
+      return false;
+    }
+    if (!impact) {
+      notifications.show({ color: "yellow", message: "Selecione o impacto." });
+      return false;
+    }
+    return true;
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
     if (!user) return;
+    if (!validate()) return;
 
     setSaving(true);
     try {
-      const payload = {
-        title: values.title.trim(),
-        description: values.description.trim(),
-        area: values.area,
-        impact: values.impact, // baixo|medio|alto
-        status: "nova",        // fluxo inicial
+      const authorName = await getAuthorNameFallback();
+
+      const ref = await addDoc(collection(db, "ideas"), {
+        title: title.trim(),
+        description: description.trim(),
+        area,
+        impact,
+        status: "nova",
+        score: 0,
+
         authorId: user.uid,
         authorEmail: user.email ?? null,
-        score: 0,
+        authorName, // << importante para exibir nome sem buscar /users
+
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      };
-
-      const ref = await addDoc(collection(db, "ideas"), payload);
-
-      notifications.show({
-        title: "Ideia enviada!",
-        message: "Sua ideia foi registrada e está com status 'nova'.",
       });
 
-      navigate(`/ideias/${ref.id}`, { replace: true }); // a gente cria essa página já já
+      notifications.show({ color: "teal", message: "Ideia enviada com sucesso!" });
+      navigate(`/ideas/${ref.id}`);
     } catch (err) {
-      notifications.show({
-        color: "red",
-        title: "Erro ao salvar",
-        message: "Não foi possível enviar a ideia. Tente novamente.",
-      });
-      console.error(err);
+      console.error("new idea error:", err);
+      // Compatível com suas regras (status precisa ser 'nova' e authorId == auth.uid)
+      const msg =
+        err?.code === "permission-denied"
+          ? "Sem permissão para criar a ideia. Verifique seu login."
+          : "Não foi possível enviar a ideia. Tente novamente.";
+      notifications.show({ color: "red", message: msg });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Paper p="lg" withBorder radius="md">
-      <Title order={3} mb="md">
-        Nova ideia
-      </Title>
+    <Paper withBorder radius="md" p="lg" component="form" onSubmit={onSubmit}>
+      <Title order={3} mb="sm">Nova ideia</Title>
+      <Text c="dimmed" mb="md">
+        Compartilhe melhorias para segurança, qualidade, produtividade e redução de custos.
+      </Text>
 
-      <form onSubmit={form.onSubmit(onSubmit)}>
-        <Stack>
-          <TextInput
-            label="Título"
-            placeholder="Ex.: Dispositivo de segurança para a TCN-18"
-            {...form.getInputProps("title")}
+      <Stack gap="sm">
+        <TextInput
+          label="Título"
+          placeholder="Ex.: Dispositivo para otimizar..."
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+
+        <Textarea
+          label="Descrição"
+          placeholder="Descreva a ideia, contexto, problema e solução proposta…"
+          minRows={4}
+          autosize
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          required
+        />
+
+        <Group grow>
+          <Select
+            label="Área"
+            data={AREAS}
+            value={area}
+            onChange={setArea}
             required
           />
-
-          <Textarea
-            label="Descrição"
-            minRows={5}
-            placeholder="Explique o problema, sua proposta e benefícios esperados."
-            {...form.getInputProps("description")}
+          <Select
+            label="Impacto"
+            data={IMPACTOS}
+            value={impact}
+            onChange={setImpact}
             required
           />
+        </Group>
 
-          <Group grow>
-            <Select
-              label="Área"
-              data={AREAS}
-              {...form.getInputProps("area")}
-              required
-            />
-            <Select
-              label="Impacto estimado"
-              data={IMPACTOS}
-              {...form.getInputProps("impact")}
-              required
-            />
-          </Group>
+        <Divider my="sm" />
 
-          <Group justify="flex-end">
-            <Button variant="light" onClick={() => navigate(-1)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button type="submit" loading={saving}>
-              Enviar ideia
-            </Button>
-          </Group>
-        </Stack>
-      </form>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => navigate(-1)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={saving}>
+            Enviar ideia
+          </Button>
+        </Group>
+      </Stack>
     </Paper>
   );
 }
