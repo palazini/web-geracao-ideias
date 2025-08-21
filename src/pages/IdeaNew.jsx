@@ -12,18 +12,14 @@ import {
   addDoc, collection, serverTimestamp, doc, getDoc
 } from "firebase/firestore";
 
+import { textToPrefixes } from '../lib/search';
+
 const AREAS = [
   { value: "produtividade", label: "Produtividade" },
   { value: "seguranca", label: "Segurança" },
   { value: "qualidade", label: "Qualidade" },
   { value: "custo", label: "Custo" },
   { value: "outros", label: "Outros" },
-];
-
-const IMPACTOS = [
-  { value: "baixo", label: "Baixo" },
-  { value: "medio", label: "Médio" },
-  { value: "alto", label: "Alto" },
 ];
 
 export default function IdeaNew() {
@@ -33,7 +29,6 @@ export default function IdeaNew() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [area, setArea] = useState("produtividade");
-  const [impact, setImpact] = useState("medio");
   const [saving, setSaving] = useState(false);
 
   // se não estiver logado, bloqueia
@@ -75,10 +70,6 @@ export default function IdeaNew() {
       notifications.show({ color: "yellow", message: "Selecione a área." });
       return false;
     }
-    if (!impact) {
-      notifications.show({ color: "yellow", message: "Selecione o impacto." });
-      return false;
-    }
     return true;
   }
 
@@ -95,13 +86,14 @@ export default function IdeaNew() {
         title: title.trim(),
         description: description.trim(),
         area,
-        impact,
         status: "nova",
         score: 0,
 
         authorId: user.uid,
         authorEmail: user.email ?? null,
-        authorName, // << importante para exibir nome sem buscar /users
+        authorName,
+
+        searchPrefixes: textToPrefixes(`${title} ${description}`),
 
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -154,13 +146,6 @@ export default function IdeaNew() {
             data={AREAS}
             value={area}
             onChange={setArea}
-            required
-          />
-          <Select
-            label="Impacto"
-            data={IMPACTOS}
-            value={impact}
-            onChange={setImpact}
             required
           />
         </Group>

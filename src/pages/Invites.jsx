@@ -6,7 +6,7 @@ import {
 import { db } from "../lib/firebase";
 import {
   collection, doc, setDoc, serverTimestamp,
-  onSnapshot, orderBy, query, where
+  onSnapshot, orderBy, query, where, getDoc
 } from "firebase/firestore";
 import dayjs from "dayjs";
 
@@ -23,6 +23,9 @@ export default function Invites() {
   const [creating, setCreating] = useState(false);
   const [list, setList] = useState([]);
 
+  // cache de perfis para usedBy -> {name, email}
+  const [usedByMap, setUsedByMap] = useState({});
+
   const invitesCol = useMemo(() => collection(db, "invites"), []);
 
   useEffect(() => {
@@ -37,6 +40,39 @@ export default function Invites() {
     return () => unsub();
   }, [invitesCol]);
 
+  // Carrega dados do usuário que USOU o token (se as regras permitirem)
+  useEffect(() => {
+    const missing = Array.from(
+      new Set(
+        list
+          .filter((inv) => inv.used && inv.usedBy && !usedByMap[inv.usedBy])
+          .map((inv) => inv.usedBy)
+      )
+    );
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (uid) => {
+          try {
+            const snap = await getDoc(doc(db, "users", uid));
+            const data = snap.exists() ? snap.data() : null;
+            const name = data?.displayName || data?.username || data?.email || uid;
+            const email = data?.email || null;
+            return [uid, { name, email }];
+          } catch {
+            return [uid, { name: uid, email: null }];
+          }
+        })
+      );
+      if (!cancelled) {
+        setUsedByMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [list, usedByMap]);
+
   async function createInvite() {
     setCreating(true);
     try {
@@ -45,11 +81,11 @@ export default function Invites() {
       const expiresAt = new Date(now.getTime() + (days || 7) * 24 * 60 * 60 * 1000);
       await setDoc(doc(db, "invites", code), {
         role: "comite",
-        email: email.trim() || null,   // opcional
+        email: email.trim() || null,   // opcional (reserva)
         createdAt: serverTimestamp(),
         expiresAt,
         used: false,
-        createdBy: "web",              // pode trocar para uid do comitê se quiser
+        createdBy: "web",              // troque para uid do comitê se quiser
       });
       setEmail("");
     } finally {
@@ -97,53 +133,56 @@ export default function Invites() {
           </Text>
         </Group>
         <Divider mb="sm" />
-        <Table
-            withBorder
-            highlightOnHover
-            style={{ tableLayout: "fixed", width: "100%" }}
-            >
-            <colgroup>
-                <col style={{ width: "22%" }} />  {/* Token */}
-                <col style={{ width: "46%" }} />  {/* E-mail */}
-                <col style={{ width: "16%" }} />  {/* Expira */}
-                <col style={{ width: "16%" }} />  {/* Status */}
-            </colgroup>
+        <Table highlightOnHover style={{ tableLayout: "fixed", width: "100%" }}>
+          <colgroup><col style={{width:"22%"}}/><col style={{width:"46%"}}/><col style={{width:"16%"}}/><col style={{width:"16%"}}/></colgroup>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>Token</th>
+              <th style={{ textAlign: "left" }}>Utilizado por</th>
+              <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Expira</th>
+              <th style={{ textAlign: "center" }}>Status</th>
+            </tr>
+          </thead>
 
-            <thead>
-                <tr>
-                <th style={{ textAlign: "left" }}>Token</th>
-                <th style={{ textAlign: "left" }}>E-mail</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Expira</th>
-                <th style={{ textAlign: "center" }}>Status</th>
-                </tr>
-            </thead>
+          <tbody>
+            {list.map((inv) => {
+              let who = null;
+              if (inv.used) {
+                // prioridade: usedEmail gravado no convite; depois busca no /users
+                const cached = inv.usedBy ? usedByMap[inv.usedBy] : null;
+                who = inv.usedEmail || cached?.email || cached?.name || inv.usedBy || "—";
+              } else {
+                who = inv.email ? `Reservado: ${inv.email}` : <Text c="dimmed">Livre</Text>;
+              }
 
-            <tbody>
-                {list.map((inv) => (
+              return (
                 <tr key={inv.id}>
-                    <td>
+                  <td>
                     <Text fw={600} ff="monospace">{inv.id}</Text>
-                    </td>
-                    <td>{inv.email || <Text c="dimmed">Livre</Text>}</td>
-                    <td style={{ textAlign: "center", whiteSpace: "nowrap", verticalAlign: "middle" }}>
+                  </td>
+                  <td>{who}</td>
+                  <td style={{ textAlign: "center", whiteSpace: "nowrap", verticalAlign: "middle" }}>
                     {inv.expiresAt?.seconds
-                        ? dayjs.unix(inv.expiresAt.seconds).format("DD/MM/YYYY")
-                        : "—"}
-                    </td>
-                    <td style={{ textAlign: "center", verticalAlign: "middle" }}>
-                    <Badge color={inv.used ? "gray" : "green"}>{inv.used ? "USADO" : "ATIVO"}</Badge>
-                    </td>
+                      ? dayjs.unix(inv.expiresAt.seconds).format("DD/MM/YYYY")
+                      : "—"}
+                  </td>
+                  <td style={{ textAlign: "center", verticalAlign: "middle" }}>
+                    <Badge color={inv.used ? "gray" : "green"}>
+                      {inv.used ? "USADO" : "ATIVO"}
+                    </Badge>
+                  </td>
                 </tr>
-                ))}
+              );
+            })}
 
-                {list.length === 0 && (
-                <tr>
-                    <td colSpan={4}>
-                    <Text c="dimmed">Nenhum convite emitido ainda.</Text>
-                    </td>
-                </tr>
-                )}
-            </tbody>
+            {list.length === 0 && (
+              <tr>
+                <td colSpan={4}>
+                  <Text c="dimmed">Nenhum convite emitido ainda.</Text>
+                </td>
+              </tr>
+            )}
+          </tbody>
         </Table>
       </Paper>
     </Stack>

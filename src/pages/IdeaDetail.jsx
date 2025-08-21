@@ -332,7 +332,6 @@ export default function IdeaDetail() {
               <Title order={3} style={{ lineHeight: 1.2 }}>{idea.title}</Title>
               <StatusBadge status={idea.status} />
               <Badge variant="light">{idea.area}</Badge>
-              <Badge variant="light">Impacto: {idea.impact}</Badge>
               {reward && <Badge color="teal">+{reward.amount} Baita Coins</Badge>}
               {idea.managerName && (
                 <Badge color="grape" variant="light" title={idea.managerEmail || ""}>

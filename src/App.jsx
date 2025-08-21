@@ -2,7 +2,6 @@ import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import AppShellLayout from "./layout/AppShellLayout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
 import IdeasList from "./pages/IdeasList";
 import IdeaNew from "./pages/IdeaNew";
 import IdeaDetail from "./pages/IdeaDetail";
@@ -59,7 +58,6 @@ export default function App() {
 
         {/* comitê */}
         <Route path="/ideias" element={<CommitteeRoute><IdeasList /></CommitteeRoute>} />
-        <Route path="/dashboard" element={<CommitteeRoute><Dashboard /></CommitteeRoute>} />
         <Route path="/admin/convites" element={<CommitteeRoute><Invites /></CommitteeRoute>} />
         <Route path="/ranking" element={<CommitteeRoute><Ranking /></CommitteeRoute>} />
         <Route path="/gestoes" element={<CommitteeRoute><MyManaged /></CommitteeRoute>} />

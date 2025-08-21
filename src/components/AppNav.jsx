@@ -36,7 +36,6 @@ export default function AppNav() {
           <LinkButton to="/ideias" icon={<IconListDetails size={18} />}>Ideias</LinkButton>
           <LinkButton to="/gestoes" icon={<IconClipboardList size={18} />}>Minhas gestões</LinkButton>
           <LinkButton to="/ranking" icon={<IconTrophy size={18} />}>Ranking</LinkButton>
-          <LinkButton to="/dashboard" icon={<IconGauge size={18} />}>Dashboard</LinkButton>
           <LinkButton to="/admin/convites" icon={<IconKey size={18} />}>Convites do comitê</LinkButton>
         </>
       ) : (
