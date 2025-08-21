@@ -11,7 +11,7 @@ import Invites from "./pages/Invites";
 import Profile from "./pages/Profile";
 import Ranking from "./pages/Ranking";
 import MyManaged from "./pages/MyManaged";
-import InstallButton from "@/components/InstallButton"; 
+import InstallButton from "./components/InstallButton"; 
 import { useAuth } from "./context/AuthContext";
 
 // exige login
