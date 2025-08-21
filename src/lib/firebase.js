@@ -1,19 +1,30 @@
+// src/lib/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  // Se quiser suportar várias abas simultâneas, descomente a linha abaixo:
+  // persistentMultipleTabManager,
+} from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FB_API_KEY,
-  authDomain: import.meta.env.VITE_FB_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FB_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FB_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FB_APP_ID,
+  apiKey: "AIzaSyAoK7zcyf0OIS57zsRcgsXDomOhJuLkaZg",
+  authDomain: "app-geracao-ideias.firebaseapp.com",
+  projectId: "app-geracao-ideias",
+  storageBucket: "app-geracao-ideias.firebasestorage.app",
+  messagingSenderId: "1045938808647",
+  appId: "1:1045938808647:web:b317fc40d3c14263ad4e62",
 };
-
 
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-export const db = getFirestore(app);
+// Firestore com cache local persistente (IndexedDB)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    // Se quiser habilitar multi-abas sem conflitos:
+    // tabManager: persistentMultipleTabManager(),
+  }),
+});
