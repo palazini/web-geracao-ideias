@@ -11,6 +11,7 @@ import Invites from "./pages/Invites";
 import Profile from "./pages/Profile";
 import Ranking from "./pages/Ranking";
 import MyManaged from "./pages/MyManaged";
+import InstallButton from "@/components/InstallButton"; 
 import { useAuth } from "./context/AuthContext";
 
 // exige login
@@ -34,7 +35,8 @@ function CommitteeRoute({ children }) {
 function PrivateAppLayout() {
   return (
     <PrivateRoute>
-      <AppShellLayout>
+      {/* 👇 passa o botão para o header do layout */}
+      <AppShellLayout headerRight={<InstallButton />}>
         <Outlet />
       </AppShellLayout>
     </PrivateRoute>

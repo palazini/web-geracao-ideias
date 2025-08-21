@@ -3,7 +3,7 @@ import { useDisclosure } from "@mantine/hooks";
 import AppHeader from "../components/AppHeader";
 import AppNav from "../components/AppNav";
 
-export default function AppShellLayout({ children }) {
+export default function AppShellLayout({ children, headerRight = null }) {
   const [opened, { toggle }] = useDisclosure();
 
   return (
@@ -14,8 +14,16 @@ export default function AppShellLayout({ children }) {
     >
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <AppHeader />
+          {/* Lado esquerdo: burger (mobile) + o que você quiser */}
+          <Group>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          </Group>
+
+          {/* Lado direito: botão de instalar (quando existir) + header/user menu */}
+          <Group gap="sm">
+            {headerRight /* ex.: <InstallButton /> vem do App.jsx */}
+            <AppHeader />
+          </Group>
         </Group>
       </AppShell.Header>
 
