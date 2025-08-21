@@ -10,10 +10,12 @@ function LinkButton({ to, icon, children }) {
     <Button
       component={NavLink}
       to={to}
-      variant={active ? "filled" : "light"}
+      variant={active ? "filled" : "subtle"}
+      size="sm"
       leftSection={icon}
       fullWidth
       justify="flex-start"
+      styles={{ label: { overflow: "hidden", textOverflow: "ellipsis" } }} // evita quebra
     >
       {children}
     </Button>
@@ -23,7 +25,7 @@ function LinkButton({ to, icon, children }) {
 export default function AppNav() {
   const { role } = useAuth();
   return (
-    <Stack gap="xs" p="sm">
+    <Stack gap="xs" p="xs">
       <LinkButton to="/" icon={<IconHome size={18} />}>Início</LinkButton>
 
       {/* Sempre visível: criar nova ideia */}

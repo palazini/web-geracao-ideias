@@ -1,0 +1,48 @@
+/* src/styles/responsive.css */
+/* ---- Tokens leves + correções anti-overflow ---- */
+:root{
+  --container-max: 1200px;
+  --gutter: 16px;
+}
+
+/* Ajusta gutters em telas maiores */
+@media (min-width: 768px){ :root{ --gutter: 20px; } }
+@media (min-width: 1024px){ :root{ --gutter: 24px; } }
+
+html, body { height: 100%; }
+body{
+  margin:0;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Evita scroll horizontal inesperado */
+*, *::before, *::after { box-sizing: border-box; }
+img, svg, video, canvas { max-width: 100%; height: auto; }
+#root { min-height: 100dvh; overflow-x: clip; }
+
+/* Contêiner padrão opcional (use quando precisar limitar largura) */
+.container{
+  width: min(100% - 2*var(--gutter), var(--container-max));
+  margin-inline: auto;
+}
+
+/* Tabelas com scroll horizontal apenas nelas (não na página toda) */
+.table-responsive{
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Utilitário p/ itens em grid/flex que estouram (textos longos) */
+.min-w-0 { min-width: 0; }
+
+/* Acessibilidade básica */
+:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
+}
+
+@media (max-width: 400px){
+  .hide-xs { display: none !important; }
+}
+

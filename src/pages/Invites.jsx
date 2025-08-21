@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Paper, Title, Stack, TextInput, NumberInput,
-  Button, Group, Table, Badge, Text, Divider, Grid
+  Button, Group, Table, Badge, Text, Divider, Grid, ScrollArea
 } from "@mantine/core";
 import { db } from "../lib/firebase";
 import {
@@ -117,8 +117,8 @@ export default function Invites() {
               max={60}
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 6, sm: 3, md: 2 }}>
-            <Button onClick={createInvite} loading={creating} mt="lg">
+          <Grid.Col span={{ base: 12, sm: 3, md: 2 }}>
+            <Button onClick={createInvite} loading={creating} fullWidth mt={{ base: "sm", sm: "lg" }}>
               Gerar token
             </Button>
           </Grid.Col>
@@ -126,64 +126,95 @@ export default function Invites() {
       </Paper>
 
       <Paper withBorder radius="md" p="lg">
-        <Group justify="space-between" mb="sm">
+        <Group justify="space-between" mb="sm" wrap="nowrap">
           <Title order={4}>Tokens emitidos</Title>
-          <Text c="dimmed" size="sm">
+          <Text c="dimmed" size="sm" visibleFrom="sm">
             Mostrando os convites mais recentes primeiro
           </Text>
         </Group>
         <Divider mb="sm" />
-        <Table highlightOnHover style={{ tableLayout: "fixed", width: "100%" }}>
-          <colgroup><col style={{width:"22%"}}/><col style={{width:"46%"}}/><col style={{width:"16%"}}/><col style={{width:"16%"}}/></colgroup>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>Token</th>
-              <th style={{ textAlign: "left" }}>Utilizado por</th>
-              <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Expira</th>
-              <th style={{ textAlign: "center" }}>Status</th>
-            </tr>
-          </thead>
+        {/* Apenas a região da tabela rola na horizontal em telas estreitas */}
+        <ScrollArea type="auto" scrollbarSize={8}>
+          <Table
+            highlightOnHover
+            striped
+            withRowBorders
+            style={{ tableLayout: "fixed", width: "100%", minWidth: 560 }}
+          >
+            {/* colgroup opcional — pode remover se preferir auto */}
+            <colgroup>
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "46%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "16%" }} />
+            </colgroup>
 
-          <tbody>
-            {list.map((inv) => {
-              let who = null;
-              if (inv.used) {
-                // prioridade: usedEmail gravado no convite; depois busca no /users
-                const cached = inv.usedBy ? usedByMap[inv.usedBy] : null;
-                who = inv.usedEmail || cached?.email || cached?.name || inv.usedBy || "—";
-              } else {
-                who = inv.email ? `Reservado: ${inv.email}` : <Text c="dimmed">Livre</Text>;
-              }
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left" }}>Token</th>
+                <th style={{ textAlign: "left" }}>Utilizado por</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Expira</th>
+                <th style={{ textAlign: "center" }}>Status</th>
+              </tr>
+            </thead>
 
-              return (
-                <tr key={inv.id}>
-                  <td>
-                    <Text fw={600} ff="monospace">{inv.id}</Text>
-                  </td>
-                  <td>{who}</td>
-                  <td style={{ textAlign: "center", whiteSpace: "nowrap", verticalAlign: "middle" }}>
-                    {inv.expiresAt?.seconds
-                      ? dayjs.unix(inv.expiresAt.seconds).format("DD/MM/YYYY")
-                      : "—"}
-                  </td>
-                  <td style={{ textAlign: "center", verticalAlign: "middle" }}>
-                    <Badge color={inv.used ? "gray" : "green"}>
-                      {inv.used ? "USADO" : "ATIVO"}
-                    </Badge>
+            <tbody>
+              {list.map((inv) => {
+                let who = null;
+
+                if (inv.used) {
+                  // prioridade: usedEmail gravado no convite; depois busca no /users
+                  const cached = inv.usedBy ? usedByMap[inv.usedBy] : null;
+                  who = inv.usedEmail || cached?.email || cached?.name || inv.usedBy || "—";
+                } else {
+                  who = inv.email ? `Reservado: ${inv.email}` : <Text component="span" c="dimmed">Livre</Text>;
+                }
+
+                return (
+                  <tr key={inv.id}>
+                    <td>
+                      <Text
+                        fw={600}
+                        ff="monospace"
+                        title={inv.id}
+                        style={{ wordBreak: "break-all" }}
+                      >
+                        {inv.id}
+                      </Text>
+                    </td>
+
+                    <td>
+                      {/* Ellipsis em uma linha; title mostra o valor completo no hover */}
+                      <Text size="sm" lineClamp={1} component="div" title={typeof who === "string" ? who : undefined}>
+                        {who}
+                      </Text>
+                    </td>
+
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap", verticalAlign: "middle" }}>
+                      {inv.expiresAt?.seconds
+                        ? dayjs.unix(inv.expiresAt.seconds).format("DD/MM/YYYY")
+                        : "—"}
+                    </td>
+
+                    <td style={{ textAlign: "center", verticalAlign: "middle" }}>
+                      <Badge color={inv.used ? "gray" : "green"} variant="filled" size="sm">
+                        {inv.used ? "Utilizado" : "Ativo"}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {list.length === 0 && (
+                <tr>
+                  <td colSpan={4}>
+                    <Text c="dimmed">Nenhum convite emitido ainda.</Text>
                   </td>
                 </tr>
-              );
-            })}
-
-            {list.length === 0 && (
-              <tr>
-                <td colSpan={4}>
-                  <Text c="dimmed">Nenhum convite emitido ainda.</Text>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </Table>
+              )}
+            </tbody>
+          </Table>
+        </ScrollArea>
       </Paper>
     </Stack>
   );
