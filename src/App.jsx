@@ -14,6 +14,8 @@ import MyManaged from "./pages/MyManaged";
 import InstallButton from "./components/InstallButton"; 
 import { useAuth } from "./context/AuthContext";
 
+import PWAStatus from "./pages/PWAStatus";
+
 // exige login
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -57,6 +59,8 @@ export default function App() {
         <Route path="/ideias/nova" element={<IdeaNew />} />
         <Route path="/ideias/:id" element={<IdeaDetail />} />
         <Route path="/ideias/:id/editar" element={<IdeaEdit />} />
+        <Route path="/pwa" element={<PWAStatus />} />
+
 
         {/* comitê */}
         <Route path="/ideias" element={<CommitteeRoute><IdeasList /></CommitteeRoute>} />
