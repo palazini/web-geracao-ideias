@@ -1,8 +1,9 @@
 // src/pages/Login.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Copy } from "lucide-react";
 import {
   Center, Paper, Title, TextInput, PasswordInput,
-  Button, Stack, Tabs, Text, Switch, Group
+  Button, Stack, Tabs, Text, Switch, Group, Modal, ActionIcon, Badge
 } from "@mantine/core";
 import { useLocation, useNavigate } from "react-router-dom";
 import { auth, db } from "../lib/firebase";
@@ -75,11 +76,24 @@ export default function Login() {
   const location = useLocation();
   const from = location.state?.from?.pathname || "/";
   const { user } = useAuth();
+  
+  // Bloqueia o redirect automático quando estivermos no fluxo de cadastro
+  const suppressRedirectRef = useRef(false);
+
+
+  // ✅ Estes hooks precisam ficar DENTRO do componente
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState({ username: "", email: "", role: "user" });
 
   // Se já logado, redireciona
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (!user) return;
+    // não redirecionar se estamos mostrando o modal
+    if (welcomeOpen) return;
+    // ou se marcamos que é um signup em andamento
+    if (suppressRedirectRef.current) return;
+    navigate("/", { replace: true });
+  }, [user, welcomeOpen, navigate]);
 
   // --- Login ---
   const [identifierIn, setIdentifierIn] = useState(""); // usuário ou e-mail
@@ -113,8 +127,10 @@ export default function Login() {
 
   async function doRegister(e) {
     e.preventDefault();
+    suppressRedirectRef.current = true; // evita redirecionar durante o cadastro
     setErrorUp("");
     setLoadingUp(true);
+
     try {
       // 1) gerar username base a partir do nome
       const base = generateUsernameFromFullName(fullNameUp);
@@ -124,13 +140,12 @@ export default function Login() {
         return;
       }
 
-      // 2) tentar criar a conta no Auth até achar um e-mail livre
+      // 2) cria a conta tentando sufixos até achar e-mail livre
       let suffix = 0;
       let username = base;
       let email = `${username}@${DOMAIN}`;
       let createdUser = null;
 
-      // tenta até 100 sufixos, só pra garantir
       while (suffix < 100) {
         try {
           const cred = await createUserWithEmailAndPassword(auth, email, passwordUp);
@@ -141,9 +156,9 @@ export default function Login() {
             suffix += 1;
             username = `${base}${suffix}`;
             email = `${username}@${DOMAIN}`;
-            continue; // tenta próximo
+            continue;
           }
-          throw err; // outro erro → exibe abaixo
+          throw err;
         }
       }
 
@@ -153,32 +168,32 @@ export default function Login() {
 
       // 3) perfil + doc em /users
       await updateProfile(createdUser, { displayName: fullNameUp.trim() }).catch(() => {});
-
-      await setDoc(
-        doc(db, "users", createdUser.uid),
-        {
-          email,
-          displayName: fullNameUp.trim(),
-          username,
-          role: "user",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const userDoc = {
+        email,
+        displayName: fullNameUp.trim(),
+        username,
+        role: "user",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(doc(db, "users", createdUser.uid), userDoc, { merge: true });
 
       // 4) se marcou comitê + token, tenta promover
+      let finalRole = userDoc.role;
       if (isCommitteeUp && inviteUp.trim()) {
         try {
           await redeemCommitteeToken(createdUser.uid, email, inviteUp);
+          finalRole = "comite"; // coerente com o restante do app
         } catch (e) {
           console.error(e);
           setErrorUp("Token inválido/expirado ou já utilizado.");
-          return; // fica na tela para corrigir o token (já logado como 'user')
+          return; // permanece na tela para corrigir o token
         }
       }
 
-      navigate("/", { replace: true });
+      // 5) Exibe modal com credenciais
+      setCreatedCreds({ username, email, role: finalRole });
+      setWelcomeOpen(true);
     } catch (err) {
       console.error(err);
       setErrorUp("Não foi possível cadastrar. Verifique os dados e tente novamente.");
@@ -274,6 +289,66 @@ export default function Login() {
           </Tabs.Panel>
         </Tabs>
       </Paper>
+
+      {/* Modal de boas-vindas com credenciais */}
+      <Modal
+        opened={welcomeOpen}
+        onClose={() => setWelcomeOpen(false)}
+        title="Cadastro concluído"
+        centered
+        size="lg"
+      >
+        <Stack gap="sm">
+          <Text c="dimmed">
+            Guarde suas informações de acesso. Você pode entrar usando o <b>usuário</b> ou o <b>e-mail</b> abaixo,
+            com a <b>senha que acabou de definir</b>.
+          </Text>
+
+          <Text size="sm" fw={600}>Usuário</Text>
+          <Group align="center" wrap="nowrap">
+            <TextInput value={createdCreds.username} readOnly style={{ flex: 1 }} />
+            <ActionIcon
+              variant="light"
+              onClick={() => navigator.clipboard.writeText(createdCreds.username)}
+              aria-label="Copiar usuário"
+              title="Copiar"
+            >
+              <Copy size={16} />
+            </ActionIcon>
+          </Group>
+
+          <Text size="sm" fw={600} mt="xs">E-mail</Text>
+          <Group align="center" wrap="nowrap">
+            <TextInput value={createdCreds.email} readOnly style={{ flex: 1 }} />
+            <ActionIcon
+              variant="light"
+              onClick={() => navigator.clipboard.writeText(createdCreds.email)}
+              aria-label="Copiar e-mail"
+              title="Copiar"
+            >
+              <Copy size={16} />
+            </ActionIcon>
+          </Group>
+
+          <Group mt="xs" gap="xs">
+            <Text c="dimmed" size="sm">Acesso:</Text>
+            <Badge variant="light" color={createdCreds.role === "comite" ? "violet" : "gray"}>
+              {createdCreds.role === "comite" ? "comitê" : "usuário"}
+            </Badge>
+          </Group>
+
+          <Group justify="flex-end" mt="md">
+            <Button
+              onClick={() => {
+                setWelcomeOpen(false);
+                navigate("/", { replace: true });
+              }}
+            >
+              Ir para o app
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Center>
   );
 }
